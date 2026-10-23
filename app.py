@@ -3,7 +3,7 @@ import numpy as np
 from rdkit import Chem
 from rdkit.Chem import AllChem
 import py3Dmol
-from stmol import showmol
+import streamlit.components.v1 as components
 
 st.set_page_config(page_title="Nitrosamine AI", layout="wide")
 st.title("Nitrosamine AI & CPCA Platform")
@@ -30,14 +30,14 @@ with tab1:
             col1, col2 = st.columns(2)
             
             with col1:
-                # 3. Render Interactive 3D Model
+                # 3. Render Interactive 3D Model natively via HTML
                 mblock = Chem.MolToMolBlock(molecule)
                 view = py3Dmol.view(width=400, height=400)
                 view.addModel(mblock, 'mol')
                 view.setStyle({'stick': {}})
                 view.zoomTo()
                 
-                showmol(view, height=400, width=400)
+                components.html(view._make_html(), height=400, width=400)
                 st.caption("Interact: Click & drag to rotate. Scroll to zoom.")
             
             with col2:
