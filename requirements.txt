@@ -3,4 +3,3 @@ pandas
 rdkit
 scikit-learn
 py3Dmol
-stmol
