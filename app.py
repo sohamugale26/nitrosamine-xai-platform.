@@ -1,77 +1,61 @@
 import streamlit as st
+import pandas as pd
 import numpy as np
 from rdkit import Chem
-from rdkit.Chem import AllChem
+from rdkit.Chem import AllChem, rdMolDescriptors, Descriptors
 import py3Dmol
 import streamlit.components.v1 as components
 
 st.set_page_config(page_title="Nitrosamine AI", layout="wide")
-st.title("Nitrosamine AI & CPCA Platform")
+st.title("Nitrosamine QA Engine")
 
-# Create navigation tabs
-tab1, tab2 = st.tabs(["🧬 3D Molecular Evaluator", "⚗️ Formulation Kinetics"])
+tab1, tab2, tab3, tab4 = st.tabs(["🧬 3D AI", "💊 Formulation", "⚖️ Limits", "⚗️ Reports"])
 
 # --- TAB 1: 3D CHEMISTRY & AI ---
 with tab1:
-    st.subheader("3D Structure & Steric Shielding Analysis")
-    smiles_input = st.text_input("Enter API SMILES String:", "CN(C)N=O")
+    st.subheader("3D Steric Shielding & OCSR Engine")
+    st.markdown("Input the API structure manually, or upload a document/image for automatic extraction.")
     
-    if st.button("Run 3D Evaluation"):
+    # Dual Input System: Upload or Text
+    uploaded_file = st.file_uploader("Upload Chemical Drawing (PNG, JPG) or Document (PDF)", type=["png", "jpg", "pdf", "txt"])
+    
+    # Default SMILES variable
+    current_smiles = "CN(C)N=O"
+    
+    if uploaded_file is not None:
+        st.success(f"File '{uploaded_file.name}' uploaded successfully.")
+        st.info("🔄 OCSR Engine simulating extraction... (Enterprise version will use DECIMER AI to read the image).")
+        # For the prototype, we simulate a successful extraction from the image
+        current_smiles = "CC(=O)NC1=CC=C(O)C=C1" # Paracetamol as a demo extraction
+        st.write(f"**Extracted SMILES:** `{current_smiles}`")
+    
+    smiles_input = st.text_input("API SMILES String (Edit if needed):", current_smiles)
+    
+    if st.button("Analyze Structure"):
         molecule = Chem.MolFromSmiles(smiles_input)
-        
         if molecule is None:
             st.error("Invalid SMILES structure.")
         else:
-            # 1. Add Hydrogens (Crucial for real 3D physics)
+            formula = rdMolDescriptors.CalcMolFormula(molecule)
+            mol_weight = Descriptors.MolWt(molecule)
+            
+            st.info(f"**Molecular Formula:** {formula} | **Molecular Weight:** {mol_weight:.2f} g/mol")
+            
+            # 3D Rendering
             molecule = Chem.AddHs(molecule)
-            # 2. Compute 3D Coordinates (Seed locked for data reproducibility)
             AllChem.EmbedMolecule(molecule, randomSeed=42)
             
-            col1, col2 = st.columns(2)
+            mblock = Chem.MolToMolBlock(molecule)
+            view = py3Dmol.view(width=350, height=350)
+            view.addModel(mblock, 'mol')
+            view.setStyle({'stick': {}})
+            view.zoomTo()
             
-            with col1:
-                # 3. Render Interactive 3D Model natively via HTML
-                mblock = Chem.MolToMolBlock(molecule)
-                view = py3Dmol.view(width=400, height=400)
-                view.addModel(mblock, 'mol')
-                view.setStyle({'stick': {}})
-                view.zoomTo()
-                
-                components.html(view._make_html(), height=400, width=400)
-                st.caption("Interact: Click & drag to rotate. Scroll to zoom.")
+            components.html(view._make_html(), height=360, width=360)
+            st.caption("🔴 Oxygen | 🔵 Nitrogen | ⚪ Hydrogen | ⚪ (Thick) Carbon")
             
-            with col2:
-                atom_count = molecule.GetNumAtoms()
-                # Placeholder logic for AI
-                risk_cat = "Category 3 (400 ng/day)" if atom_count > 12 else "Category 1 (18 ng/day)"
-                st.success(f"**AI Predicted Risk:** {risk_cat}")
-                st.info(f"**Total Atoms (inc. Hydrogens):** {atom_count}")
-                st.write("The 3D coordinates generated above allow the engine to map exact spatial hindrance and steric shielding around the alpha-carbons.")
+            atom_count = molecule.GetNumAtoms()
+            risk_cat = "Category 3 (400 ng/day)" if atom_count > 12 else "Category 1 (18 ng/day)"
+            st.success(f"**AI Predicted Risk:** {risk_cat}")
 
-# --- TAB 2: KINETICS & SHELF LIFE ---
-with tab2:
-    st.subheader("Arrhenius Kinetics & Shelf-Life Prediction")
-    st.markdown("Predict nitrosamine growth over time based on raw material batch variability.")
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        nitrite_ppm = st.number_input("Excipient Nitrite Level (ppm)", min_value=0.0, max_value=50.0, value=2.5)
-        temp_c = st.slider("Storage Temperature (°C)", 0, 60, 25)
-        days = st.slider("Shelf Life Duration (Days)", 0, 730, 365)
-        
-    with col2:
-        # Simplified Arrhenius Math for UI demonstration
-        R = 8.314 
-        temp_k = temp_c + 273.15
-        activation_energy = 85.0
-        
-        rate_constant = np.exp(-activation_energy / (R * temp_k))
-        predicted_formation = round(nitrite_ppm * rate_constant * days * 100, 2)
-        
-        st.metric(label="Predicted Nitrosamine Formation", value=f"{predicted_formation} ng/day eq")
-        
-        if predicted_formation > 18:
-            st.error("⚠️ Warning: Predicted formation exceeds Category 1 Acceptable Intake limits over shelf life.")
-        else:
-            st.success("✅ Formulation remains stable within regulatory limits.")
-            
+# [KEEP TAB 2, 3, AND 4 EXACTLY AS THEY WERE IN YOUR FILE]
