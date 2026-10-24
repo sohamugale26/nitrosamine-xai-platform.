@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import datetime
+import requests
 from rdkit import Chem
 from rdkit.Chem import AllChem, rdMolDescriptors, Descriptors
 import py3Dmol
@@ -12,59 +13,88 @@ st.title("NitroPredict: QbD Assessment Engine")
 
 tab1, tab2, tab3, tab4, tab5 = st.tabs(["🧬 3D AI", "💊 Supply Chain", "⚖️ Limits", "⚗️ Kinetics", "📊 Report"])
 
-# Initialize session state for the AI limit so Tab 1 can auto-fill Tab 3
 if 'auto_ai_limit' not in st.session_state:
-    st.session_state.auto_ai_limit = 26.5  # Default strict limit
+    st.session_state.auto_ai_limit = 26.5  
 
 # --- TAB 1: 3D CHEMISTRY & AI ---
 with tab1:
     st.subheader("3D Steric Shielding & OCSR Engine")
-    uploaded_file = st.file_uploader("Upload Chemical Drawing (PDF/IMG)", type=["png", "jpg", "pdf"])
     
-    default_smiles = "CN(C)N=O"
-    if uploaded_file is not None:
-        st.success(f"File '{uploaded_file.name}' uploaded successfully.")
-        st.info("🔄 OCSR Engine simulating extraction...")
-        default_smiles = "CC(=O)NC1=CC=C(O)C=C1" 
+    # 1. The Internal Portfolio Dictionary
+    portfolio = {
+        "Custom Search (Live PubChem API)": "",
+        "Paracetamol (Acetaminophen)": "CC(=O)NC1=CC=C(O)C=C1",
+        "Metformin (High Risk)": "CN(C)C(=NC(=N)N)N",
+        "Valsartan (Sartan Class)": "CCCCC(=O)N(CC1=CC=C(C=C1)C2=CC=CC=C2C3=NNN=N3)C(C(C)C)C(=O)O",
+        "Ibuprofen": "CC(C)CC1=CC=C(C=C1)C(C)C(=O)O"
+    }
     
-    smiles_input = st.text_input("API SMILES String:", default_smiles, key="api_smiles")
+    selected_drug = st.selectbox("Select API from Internal Portfolio or Search Global Database:", list(portfolio.keys()))
+    
+    fetched_smiles = ""
+    
+    # 2. The Live NIH PubChem Integration
+    if selected_drug == "Custom Search (Live PubChem API)":
+        search_name = st.text_input("Enter API Name to fetch from NIH PubChem (e.g., Losartan):")
+        if search_name:
+            with st.spinner(f"Querying NIH PubChem database for '{search_name}'..."):
+                try:
+                    url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{search_name}/property/CanonicalSMILES/JSON"
+                    response = requests.get(url)
+                    if response.status_code == 200:
+                        data = response.json()
+                        fetched_smiles = data['PropertyTable']['Properties'][0]['CanonicalSMILES']
+                        st.success(f"✅ Live Connection Successful. Fetched SMILES: `{fetched_smiles}`")
+                    else:
+                        st.error("⚠️ Drug not found in PubChem. Please check spelling.")
+                except Exception as e:
+                    st.error("Error connecting to external database.")
+    else:
+        fetched_smiles = portfolio[selected_drug]
+        st.info("Loaded pre-validated SMILES from internal company portfolio.")
+        
+    smiles_input = st.text_input("API SMILES String (Verify or Edit):", value=fetched_smiles, key="api_smiles")
     
     if st.button("Analyze Structure"):
-        molecule = Chem.MolFromSmiles(smiles_input)
-        if molecule:
-            formula = rdMolDescriptors.CalcMolFormula(molecule)
-            mol_weight = Descriptors.MolWt(molecule)
-            st.info(f"**Formula:** {formula} | **Weight:** {mol_weight:.2f} g/mol")
+        # The empty-box safety check
+        if not smiles_input.strip():
+            st.error("🛑 Please enter a valid SMILES string or select an API before analyzing.")
+        else:
+            molecule = Chem.MolFromSmiles(smiles_input)
             
-            # --- NEW: ZERO-CLICK AUTOMATION ENGINE ---
-            # Define mathematical patterns for vulnerable amines
-            sec_amine_pattern = Chem.MolFromSmarts("[NX3;H1]([C,c])([C,c])")
-            tert_amine_pattern = Chem.MolFromSmarts("[NX3;H0]([C,c])([C,c])([C,c])")
-            
-            has_sec = molecule.HasSubstructMatch(sec_amine_pattern)
-            has_tert = molecule.HasSubstructMatch(tert_amine_pattern)
-            
-            if has_sec:
-                st.error("⚠️ **HIGH RISK DETECTED:** Vulnerable Secondary (2°) Amine identified in API structure.")
-                st.write("CPCA Engine assigns **Category 1** (High Potency). Auto-setting Acceptable Intake to **26.5 ng/day**.")
-                st.session_state.auto_ai_limit = 26.5
-            elif has_tert:
-                st.warning("⚠️ **MODERATE RISK DETECTED:** Tertiary (3°) Amine identified in API structure.")
-                st.write("CPCA Engine assigns **Category 3/4** (Sterically Shielded). Auto-setting Acceptable Intake to **400.0 ng/day**.")
-                st.session_state.auto_ai_limit = 400.0
+            if molecule and molecule.GetNumAtoms() > 0:
+                formula = rdMolDescriptors.CalcMolFormula(molecule)
+                mol_weight = Descriptors.MolWt(molecule)
+                st.info(f"**Formula:** {formula} | **Weight:** {mol_weight:.2f} g/mol")
+                
+                sec_amine_pattern = Chem.MolFromSmarts("[NX3;H1]([C,c])([C,c])")
+                tert_amine_pattern = Chem.MolFromSmarts("[NX3;H0]([C,c])([C,c])([C,c])")
+                
+                has_sec = molecule.HasSubstructMatch(sec_amine_pattern)
+                has_tert = molecule.HasSubstructMatch(tert_amine_pattern)
+                
+                if has_sec:
+                    st.error("⚠️ **HIGH RISK DETECTED:** Vulnerable Secondary (2°) Amine identified in API structure.")
+                    st.write("CPCA Engine assigns **Category 1** (High Potency). Auto-setting Acceptable Intake to **26.5 ng/day**.")
+                    st.session_state.auto_ai_limit = 26.5
+                elif has_tert:
+                    st.warning("⚠️ **MODERATE RISK DETECTED:** Tertiary (3°) Amine identified in API structure.")
+                    st.write("CPCA Engine assigns **Category 3/4** (Sterically Shielded). Auto-setting Acceptable Intake to **400.0 ng/day**.")
+                    st.session_state.auto_ai_limit = 400.0
+                else:
+                    st.success("✅ **NO VULNERABLE AMINES DETECTED:** Structure appears resistant to direct nitrosation.")
+                    st.session_state.auto_ai_limit = 1500.0
+                
+                molecule = Chem.AddHs(molecule)
+                AllChem.EmbedMolecule(molecule, randomSeed=42)
+                mblock = Chem.MolToMolBlock(molecule)
+                view = py3Dmol.view(width=350, height=350)
+                view.addModel(mblock, 'mol')
+                view.setStyle({'stick': {}})
+                view.zoomTo()
+                components.html(view._make_html(), height=360, width=360)
             else:
-                st.success("✅ **NO VULNERABLE AMINES DETECTED:** Structure appears resistant to direct nitrosation.")
-                st.session_state.auto_ai_limit = 1500.0
-            
-            # 3D Rendering
-            molecule = Chem.AddHs(molecule)
-            AllChem.EmbedMolecule(molecule, randomSeed=42)
-            mblock = Chem.MolToMolBlock(molecule)
-            view = py3Dmol.view(width=350, height=350)
-            view.addModel(mblock, 'mol')
-            view.setStyle({'stick': {}})
-            view.zoomTo()
-            components.html(view._make_html(), height=360, width=360)
+                st.error("🛑 Invalid chemical structure. RDKit could not parse the SMILES string.")
 
 # --- TAB 2: SUPPLY CHAIN METADATA ---
 with tab2:
@@ -94,7 +124,6 @@ with tab2:
 # --- TAB 3: REGULATORY CALCULATOR ---
 with tab3:
     st.subheader("Acceptable Intake (AI) Calculator")
-    # Tab 3 now auto-updates based on what Tab 1 found!
     st.info("💡 The Acceptable Intake limit is automatically set by the 3D CPCA Engine in Tab 1, but can be manually overridden below.")
     ai_limit = st.number_input("Acceptable Intake (ng/day)", value=st.session_state.auto_ai_limit, key="ai_limit")
     max_dose = st.number_input("Maximum Daily Dose of API (mg/day)", value=500.0, key="max_dose")
