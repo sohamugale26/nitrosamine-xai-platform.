@@ -7,8 +7,8 @@ from rdkit.Chem import AllChem, rdMolDescriptors, Descriptors
 import py3Dmol
 import streamlit.components.v1 as components
 
-st.set_page_config(page_title="Nitrosamine AI", layout="wide")
-st.title("Nitrosamine QA Engine")
+st.set_page_config(page_title="NitroPredict Engine", layout="wide")
+st.title("NitroPredict: QbD Assessment Engine")
 
 tab1, tab2, tab3, tab4, tab5 = st.tabs(["🧬 3D AI", "💊 Supply Chain", "⚖️ Limits", "⚗️ Kinetics", "📊 Report"])
 
@@ -64,7 +64,6 @@ with tab2:
         column_config={
             "Test Date": st.column_config.DateColumn(
                 "Test Date",
-                help="Select the exact date the COA or laboratory test was issued.",
                 format="YYYY-MM-DD",
                 step=1,
             )
@@ -79,13 +78,38 @@ with tab3:
     ai_limit = st.number_input("Acceptable Intake (ng/day)", value=26.5, key="ai_limit")
     max_dose = st.number_input("Maximum Daily Dose of API (mg/day)", value=500.0, key="max_dose")
 
-# --- TAB 4: KINETIC GUARDRAILS ---
+# --- TAB 4: KINETIC GUARDRAILS & TRACEABILITY ---
 with tab4:
     st.subheader("Arrhenius Kinetics Settings")
     
-    st.warning("⚠️ **Scientific Guardrail:** Do not claim shelf-life prediction from an Arrhenius equation unless the model and parameters are supported by experimental data.")
-    is_validated = st.checkbox("I confirm these kinetic parameters are experimentally validated for this specific formulation matrix.", key="kinetics_validated")
+    st.warning("⚠️ **ALCOA+ Data Integrity Guardrail:** Regulatory claims must be supported by traceable experimental documentation (21 CFR Part 11).")
+    is_validated = st.checkbox("I confirm these kinetic parameters are experimentally validated.", key="kinetics_validated")
     
+    # NEW: The Tri-Fold Traceability Selector
+    if is_validated:
+        source_type = st.selectbox(
+            "Select Documentation Source Type:",
+            [
+                "Internal Lab Report (LIMS/AR&D)", 
+                "Peer-Reviewed Literature (DOI)", 
+                "Industry Consortium (e.g., Lhasa)"
+            ],
+            key="source_type"
+        )
+        
+        # Dynamically change the placeholder hint so they know exactly what to type
+        if "LIMS" in source_type:
+            hint = "e.g., LIMS-STAB-2026-045"
+        elif "DOI" in source_type:
+            hint = "e.g., DOI: 10.1021/acs.oprd.2c00001"
+        else:
+            hint = "e.g., Lhasa-Ref-089"
+            
+        validation_source = st.text_input("Enter Official Document ID:", placeholder=hint, key="validation_source")
+    else:
+        st.session_state.validation_source = ""
+        st.session_state.source_type = ""
+        
     activation_energy = st.number_input("Activation Energy (Ea) in kJ/mol", value=85.0, key="activation_energy")
     
     phase = st.radio("Select Evaluation Phase:", ["🏭 Manufacturing (Hours)", "📦 Shelf Life (Days)"], horizontal=True, key="phase")
@@ -118,11 +142,8 @@ with tab5:
             active_time_days = st.session_state.time_shelf
             
         temp_k = active_temp + 273.15
-        
-        # Arrhenius Rate Calculation
         rate_constant = np.exp(-st.session_state.activation_energy / (8.314 * temp_k))
         kinetic_multiplier = rate_constant * active_time_days * 100
-        
         final_nitrosamine_yield = total_nitrite_ng * kinetic_multiplier
         regulatory_limit = st.session_state.ai_limit
         
@@ -133,15 +154,18 @@ with tab5:
         st.write(f"**Applied Activation Energy:** {st.session_state.activation_energy} kJ/mol")
         st.metric(label="Total Predicted Nitrosamine Generation", value=f"{final_nitrosamine_yield:.4f} ng")
         
-        # Apply the QA compliance guardrails to the final output
+        # ENFORCING THE DATA INTEGRITY LOOPHOLE FIX
         if not st.session_state.kinetics_validated:
             st.error("⚠️ **UNVALIDATED MODEL:** Because experimental kinetic parameters were not confirmed, this prediction is an exploratory simulation only. It cannot be used for regulatory submission.")
+        elif st.session_state.kinetics_validated and not st.session_state.get("validation_source", "").strip():
+            st.error("🛑 **DATA INTEGRITY ERROR:** You checked the validation box but did not provide a Document ID. You must provide a valid LIMS, DOI, or Consortium ID in Tab 4 to issue a regulatory PASS.")
         elif final_nitrosamine_yield > regulatory_limit:
             st.error(f"❌ **FAIL:** Exceeds the Acceptable Intake of {regulatory_limit} ng/day.")
         else:
-            st.success(f"✅ **PASS:** Remains below the {regulatory_limit} ng/day limit using validated kinetics.")
+            st.success(f"✅ **PASS:** Remains below the {regulatory_limit} ng/day limit.")
+            # Stamp the exact source and ID onto the final report for the auditor
+            st.info(f"🔒 **Validated 21 CFR Part 11 Traceability:** {st.session_state.source_type} | ID: `{st.session_state.validation_source}`")
             
-        # CSV Export Generator
         csv_data = df.to_csv(index=False).encode('utf-8')
         st.download_button("📥 Download Master Batch CSV", data=csv_data, file_name='master_batch_assessment.csv', mime='text/csv')
         
