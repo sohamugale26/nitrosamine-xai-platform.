@@ -1,0 +1,23 @@
+{
+  "Pantoprazole (Thesis Target)": "COC1=C(C=C2C(=C1)N=C(N2)CS(=O)CC3=C(C=C(C=N3)OC)OC(F)F",
+  "Ranitidine (High Risk - NDMA formation)": "CN(C)Cc1ccc(CSCCN/C(=C\\N(=O)=O)/NC)o1",
+  "Nizatidine (High Risk - NDMA formation)": "CN(C)Cc1csc(CSCCN/C(=C\\N(=O)=O)/NC)n1",
+  "Metformin (High Risk - Dimethylamine)": "CN(C)C(=NC(=N)N)N",
+  "Valsartan (Sartan Class)": "CCCCC(=O)N(CC1=CC=C(C=C1)C2=CC=CC=C2C3=NNN=N3)C(C(C)C)C(=O)O",
+  "Losartan (Sartan Class)": "CCCC1=NC(=C(N1CC2=CC=C(C=C2)C3=CC=CC=C3C4=NNN=N4)CO)Cl",
+  "Sertraline (Secondary Amine)": "CNC1CCC(C2=CC=CC=C12)C3=CC=C(C=C3Cl)Cl",
+  "Fluoxetine (Secondary Amine)": "CNC(C)CCC(=O)c1ccccc1",
+  "Duloxetine (Secondary Amine)": "CNCCC(c1cccs1)Oc2cccc3ccccc23",
+  "Amitriptyline (Tertiary Amine)": "CN(C)CCC=C1c2ccccc2CCc3ccccc13",
+  "Nortriptyline (Secondary Amine)": "CNCCC=C1C2=CC=CC=C2CCC3=CC=CC=C13",
+  "Diclofenac (Secondary Amine)": "C1=CC=C(C(=C1)CC(=O)O)NC2=C(C=CC=C2Cl)Cl",
+  "Atomoxetine (Secondary Amine)": "CNCCC(c1ccccc1)Oc2ccccc2C",
+  "Orphenadrine (Tertiary Amine)": "CC1=CC=CC=C1C(C2=CC=CC=C2)OCCN(C)C",
+  "Diphenhydramine (Tertiary Amine)": "CN(C)CCOC(C1=CC=CC=C1)C2=CC=CC=C2",
+  "Cetirizine (Piperazine Ring)": "C1CN(CCN1CC2=CC=C(C=C2)Cl)C(C3=CC=CC=C3)C4=CC=CC=C4",
+  "Pioglitazone (Secondary Amine)": "CCC1=CC=C(C=C1)OCCC2=NC=C(C=C2)CC3C(=O)NC(=O)S3",
+  "Atenolol (Secondary Amine)": "CC(C)NCC(O)COC1=CC=C(CC(N)=O)C=C1",
+  "Paracetamol (Negative Control - Safe)": "CC(=O)NC1=CC=C(O)C=C1",
+  "Ibuprofen (Negative Control - Safe)": "CC(C)CC1=CC=C(C=C1)C(C)C(=O)O",
+  "Aspirin (Negative Control - Safe)": "CC(=O)OC1=CC=CC=C1C(=O)O"
+}
